@@ -43,6 +43,8 @@ const HomePage = () => {
           <span>Welcome, {user?.fullName || user?.username}</span>
           <button onClick={handleLogout} className="logout-btn">Logout</button>
         </div>
+        {/* // In your navigation component
+<Link to="/sessions">Manage Sessions</Link> */}
       </nav>
 
       {/* Content Section */}

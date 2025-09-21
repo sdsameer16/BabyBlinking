@@ -23,7 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 # dependencies
-/node_modules
+        node_modules/
 
 # build outputs
 /build

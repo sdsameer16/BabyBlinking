@@ -24,8 +24,10 @@ export default function App() {
               <HomePage />
             </ProtectedRoute>
           } />
+          {/* <Route path="/sessions" element={<UserSessions />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} /> */}
         </Routes>
       </BrowserRouter>
-    </AuthProvider>
+     </AuthProvider>
   );
 }
