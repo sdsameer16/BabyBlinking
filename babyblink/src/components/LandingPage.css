@@ -1,0 +1,112 @@
+/* Reset for full page background */
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+  height: 100% !important;
+  width: 100% !important;
+  overflow-x: hidden;
+}
+
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  width: 100vw;
+}
+
+.landing-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5rem;
+  height: 100vh;
+  width: 100vw;
+  background-image: url("../assets/imge.avif");
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  margin: 0;
+  padding: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  font-family: Arial, sans-serif;
+  flex-direction: column;
+}
+
+h1 {
+  font-size: 4em;
+  font-weight: bold;
+  color: white;
+  display: inline-block;
+
+}
+
+/* Wave animation for each letter */
+h1 span {
+  display: inline-block;
+  animation: wave 1.5s infinite ease-in-out;
+  margin-right: 0.1em;
+}
+
+@keyframes wave {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-50px);
+  }
+}
+
+/* Button */
+.login-btn {
+  position: fixed;
+  right: 25px;
+  top: 5px;
+  padding: 10px 20px;
+  background-color: #ff4d4d;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 25px;
+  height: 50px;
+  cursor: pointer;
+}
+
+.login-btn:hover {
+  background-color: #e60000;
+}
+
+/* Animation delay for wave effect */
+h1 span:nth-child(1) {
+  animation-delay: 0s;
+}
+h1 span:nth-child(2) {
+  animation-delay: 0.1s;
+}
+h1 span:nth-child(3) {
+  animation-delay: 0.2s;
+}
+h1 span:nth-child(4) {
+  animation-delay: 0.3s;
+}
+h1 span:nth-child(5) {
+  animation-delay: 0.4s;
+}
+h1 span:nth-child(6) {
+  animation-delay: 0.5s;
+}
+h1 span:nth-child(7) {
+  animation-delay: 0.6s;
+}
+h1 span:nth-child(8) {
+  animation-delay: 0.7s;
+}
+h1 span:nth-child(9) {
+  animation-delay: 0.8s;
+}
+h1 span:nth-child(10) {
+  animation-delay: 0.9s;
+}

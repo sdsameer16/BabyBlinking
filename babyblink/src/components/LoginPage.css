@@ -1,0 +1,131 @@
+/* Login container with full screen background */
+.login-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100vw;
+  margin: 0;
+  padding: 20px;
+  background-image: url("../assets/loginorRegister.png");
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  position: fixed;
+  top: 0;
+  left: 0;
+}
+
+/* Home link styling */
+.home-link {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  color: white;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 16px;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
+  z-index: 10;
+}
+
+.home-link:hover {
+  text-decoration: underline;
+}
+
+/* Login form with glassmorphism */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  color: #222;
+  text-align: center;
+  justify-content: center;
+  padding: 40px 50px;
+  border-radius: 20px;
+  gap: 20px;
+  width: 350px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+
+/* Form heading */
+.login-form h2 {
+  margin: 0 0 20px 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #333;
+}
+
+/* Input fields */
+.login-form input[type="text"],
+.login-form input[type="password"],
+.login-form input {
+  padding: 15px;
+  font-size: 16px;
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  outline: none;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.9);
+  box-sizing: border-box;
+}
+
+.login-form input::placeholder {
+  color: #666;
+}
+
+/* Submit button */
+.login-form button[type="submit"],
+.login-form button {
+  background-color: #4a90e2;
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  padding: 15px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.login-form button:hover {
+  background-color: #357abd;
+}
+
+/* Message styling */
+.message {
+  color: #ff4444;
+  font-weight: 600;
+  margin: 10px 0;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 10px;
+  border-radius: 8px;
+  min-height: 20px;
+}
+
+/* Register link paragraph */
+.login-container > p {
+  color: white;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7);
+  margin-top: 20px;
+  font-size: 16px;
+}
+
+/* Register link */
+.login-container p a {
+  color: #ffdd57;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login-container p a:hover {
+  text-decoration: underline;
+  color: #fff;
+}
