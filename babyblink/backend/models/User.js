@@ -12,7 +12,23 @@ const userSchema = new mongoose.Schema({
   address: String,
   isVerified: { type: Boolean, default: false }, // after OTP
   otp: String,
-  otpExpires: Date
+  otpExpires: Date,
+  // Admin blocking functionality
+  isBlocked: {
+    type: Boolean,
+    default: false
+  },
+  blockReason: {
+    type: String,
+    trim: true
+  },
+  blockedAt: {
+    type: Date
+  },
+  blockedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin'
+  }
 }, { timestamps: true });
 
 export default mongoose.model("User", userSchema);
