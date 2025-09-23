@@ -1,21 +1,24 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import "./ForgotPasswordPage.css";
+import { Link, useNavigate } from "react-router-dom";
+import "./LoginPage.css"; // Reuse login page styles
 
 export default function ForgotPasswordPage() {
   const navigate = useNavigate();
-  
-  const [step, setStep] = useState(1); // 1: Email, 2: OTP, 3: New Password
-  const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [step, setStep] = useState(1); // 1: Enter Email, 2: Enter OTP & New Password
+  const [form, setForm] = useState({
+    email: "",
+    otp: "",
+    newPassword: "",
+    confirmPassword: ""
+  });
   
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
 
   const displayMessage = (msg, type = "info") => {
     setMessage(msg);
@@ -23,140 +26,156 @@ export default function ForgotPasswordPage() {
     setTimeout(() => setMessage(""), 5000);
   };
 
-  // Step 1: Send OTP to email
   const handleSendOTP = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
+  
+  if (!form.email) {
+    displayMessage("Please enter your email address", "error");
+    return;
+  }
+
+  setLoading(true);
+  setMessage("");
+
+  try {
+    console.log("Sending forgot password request to:", "/api/auth/forgot-password");
+    console.log("Request body:", JSON.stringify({ email: form.email }));
     
-    if (!email) {
-      displayMessage("Please enter your email address", "error");
-      return;
-    }
+   // In ForgotPasswordPage.jsx, update the fetch URL:
+const response = await fetch("http://localhost:5000/api/auth/forgot-password", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ email: form.email }),
+});
 
-    setLoading(true);
-    setMessage("");
+    console.log("Response status:", response.status);
+    console.log("Response ok:", response.ok);
+    
+    // Get the raw response text first
+    const responseText = await response.text();
+    console.log("Raw response:", responseText);
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        displayMessage("OTP sent to your email! Check your inbox.", "success");
-        setStep(2);
-      } else {
-        displayMessage(data.error || "Failed to send OTP", "error");
+    // Try to parse as JSON
+    let data;
+    if (responseText) {
+      try {
+        data = JSON.parse(responseText);
+        console.log("Parsed JSON:", data);
+      } catch (parseError) {
+        console.error("Failed to parse JSON:", parseError);
+        displayMessage("Server returned invalid response", "error");
+        return;
       }
-    } catch (error) {
-      console.error('Send OTP error:', error);
-      displayMessage("Network error. Please check your connection.", "error");
-    }
-    
-    setLoading(false);
-  };
-
-  // Step 2: Verify OTP and Reset Password
-  const handleResetPassword = async (e) => {
-    e.preventDefault();
-    
-    if (!otp || otp.length !== 6) {
-      displayMessage("Please enter a valid 6-digit OTP", "error");
+    } else {
+      console.error("Empty response received");
+      displayMessage("Server returned empty response", "error");
       return;
     }
 
-    if (!newPassword || newPassword.length < 6) {
-      displayMessage("Password must be at least 6 characters long", "error");
-      return;
+    if (data.success) {
+      displayMessage("Password reset code sent! Check your email.", "success");
+      setStep(2);
+    } else {
+      displayMessage(data.error || "Failed to send reset code", "error");
     }
+  } catch (error) {
+    console.error("Network error:", error);
+    displayMessage("Network error. Please try again.", "error");
+  }
+  
+  setLoading(false);
+ };
 
-    if (newPassword !== confirmPassword) {
-      displayMessage("Passwords do not match", "error");
-      return;
-    }
+ 
+ const handleResetPassword = async (e) => {
+  e.preventDefault();
+  
+  if (!form.otp || !form.newPassword || !form.confirmPassword) {
+    displayMessage("Please fill in all fields", "error");
+    return;
+  }
 
-    setLoading(true);
-    setMessage("");
+  if (form.newPassword !== form.confirmPassword) {
+    displayMessage("Passwords don't match", "error");
+    return;
+  }
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          otp,
-          newPassword,
-        }),
-      });
+  if (form.newPassword.length < 6) {
+    displayMessage("Password must be at least 6 characters long", "error");
+    return;
+  }
 
-      const data = await response.json();
+  setLoading(true);
+  setMessage("");
 
-      if (response.ok) {
-        displayMessage("Password reset successful! Redirecting to login...", "success");
-        setTimeout(() => navigate("/login"), 2000);
-      } else {
-        displayMessage(data.error || "Failed to reset password", "error");
+  try {
+    console.log("Sending reset password request...");
+    const response = await fetch("http://localhost:5000/api/auth/reset-password", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ 
+        email: form.email, 
+        otp: form.otp, 
+        newPassword: form.newPassword 
+      }),
+    });
+
+    const responseText = await response.text();
+    console.log("Raw response:", responseText);
+
+    let data;
+    if (responseText) {
+      try {
+        data = JSON.parse(responseText);
+        console.log("Parsed response:", data);
+      } catch (parseError) {
+        console.error("Failed to parse JSON:", parseError);
+        displayMessage("Server returned invalid response", "error");
+        return;
       }
-    } catch (error) {
-      console.error('Reset password error:', error);
-      displayMessage("Network error. Please try again.", "error");
+    } else {
+      console.error("Empty response received");
+      displayMessage("Server returned empty response", "error");
+      return;
     }
-    
-    setLoading(false);
-  };
 
-  // Resend OTP
-  const handleResendOTP = async () => {
-    setLoading(true);
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        displayMessage("New OTP sent to your email!", "success");
-      } else {
-        displayMessage(data.error || "Failed to resend OTP", "error");
-      }
-    } catch (error) {
-      console.error('Resend OTP error:', error);
-      displayMessage("Network error. Please try again.", "error");
+    if (data.success) {
+      displayMessage("Password reset successful! Redirecting to login...", "success");
+      setTimeout(() => {
+        navigate("/login");
+      }, 2000);
+    } else {
+      displayMessage(data.error || "Password reset failed", "error");
     }
-    
-    setLoading(false);
-  };
+  } catch (error) {
+    console.error("Network error:", error);
+    displayMessage("Network error. Please try again.", "error");
+  }
+  
+  setLoading(false);
+};
 
   return (
-    <div className="forgot-password-container">
-      <Link to="/login" className="back-link">← Back to Login</Link>
+    <div className="login-container">
+      <Link to="/login" className="home-link">← Back to Login</Link>
       
-      <div className="forgot-password-form-container">
-        
-        {/* Step 1: Enter Email */}
-        {step === 1 && (
-          <form className="forgot-password-form" onSubmit={handleSendOTP}>
-            <h2>🔐 Forgot Password</h2>
-            <p className="form-subtitle">Enter your email to receive a reset code</p>
+      <div className="login-form-container">
+        {step === 1 ? (
+          <form className="login-form" onSubmit={handleSendOTP}>
+            <h2>Forgot Password? 🔐</h2>
+            <p className="login-subtitle">Enter your email to reset your password</p>
             
             <div className="form-group">
               <input
+                name="email"
                 type="email"
                 placeholder="Enter your email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={form.email}
+                onChange={handleChange}
                 required
                 autoComplete="email"
               />
@@ -170,47 +189,45 @@ export default function ForgotPasswordPage() {
               {loading ? "Sending..." : "Send Reset Code"}
             </button>
           </form>
-        )}
-
-        {/* Step 2: Enter OTP and New Password */}
-        {step === 2 && (
-          <form className="forgot-password-form" onSubmit={handleResetPassword}>
-            <h2>🔑 Reset Your Password</h2>
-            <p className="form-subtitle">Enter the 6-digit code sent to {email}</p>
+        ) : (
+          <form className="login-form" onSubmit={handleResetPassword}>
+            <h2>Reset Password 🔐</h2>
+            <p className="login-subtitle">Enter the code sent to {form.email}</p>
             
             <div className="form-group">
               <input
+                name="otp"
                 type="text"
                 placeholder="Enter 6-digit code"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                value={form.otp}
+                onChange={handleChange}
                 required
                 maxLength="6"
-                className="otp-input"
+                pattern="[0-9]{6}"
               />
             </div>
 
             <div className="form-group">
               <input
+                name="newPassword"
                 type="password"
-                placeholder="New password (min 6 characters)"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="New Password (min 6 characters)"
+                value={form.newPassword}
+                onChange={handleChange}
                 required
                 minLength="6"
-                autoComplete="new-password"
               />
             </div>
 
             <div className="form-group">
               <input
+                name="confirmPassword"
                 type="password"
-                placeholder="Confirm new password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm New Password"
+                value={form.confirmPassword}
+                onChange={handleChange}
                 required
                 minLength="6"
-                autoComplete="new-password"
               />
             </div>
 
@@ -221,35 +238,33 @@ export default function ForgotPasswordPage() {
             >
               {loading ? "Resetting..." : "Reset Password"}
             </button>
-
-            <div className="resend-section">
-              <p>Didn't receive the code?</p>
+            
+            <div style={{marginTop: "15px", textAlign: "center"}}>
               <button 
                 type="button"
-                onClick={handleResendOTP}
-                disabled={loading}
-                className="resend-btn"
+                onClick={() => setStep(1)}
+                style={{
+                  background: "none", 
+                  border: "none", 
+                  color: "#666", 
+                  textDecoration: "underline",
+                  cursor: "pointer",
+                  fontSize: "14px"
+                }}
               >
-                {loading ? "Sending..." : "Resend Code"}
+                ← Use different email
               </button>
             </div>
           </form>
         )}
 
-        {/* Progress indicator */}
-        <div className="progress-indicator">
-          <div className={`step ${step >= 1 ? 'active' : ''}`}>1</div>
-          <div className={`step ${step >= 2 ? 'active' : ''}`}>2</div>
-        </div>
-
-        {/* Message display */}
         {message && (
           <div className={`message ${messageType}`}>
             <p>{message}</p>
           </div>
         )}
 
-        <div className="login-link">
+        <div className="register-link">
           <p>Remember your password? <Link to="/login">Sign in here</Link></p>
         </div>
       </div>

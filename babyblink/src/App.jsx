@@ -5,6 +5,8 @@ import LoginPage from "./components/LoginPage";
 import RegisterPage from "./components/RegisterPage";
 import HomePage from "./components/HomePage";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ForgotPasswordPage from "./components/ForgotPasswordPage";
+import SessionManager from "./components/sessionManager";
 
 export default function App() {
   return (
@@ -24,8 +26,8 @@ export default function App() {
               <HomePage />
             </ProtectedRoute>
           } />
-          {/* <Route path="/sessions" element={<UserSessions />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} /> */}
+          <Route path="/sessions" element={<SessionManager />}/>
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         </Routes>
       </BrowserRouter>
      </AuthProvider>
