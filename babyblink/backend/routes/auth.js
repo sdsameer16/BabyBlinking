@@ -423,6 +423,18 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ error: "Invalid credentials" });
     }
 
+    // 🚫 CHECK IF USER IS BLOCKED BY ADMIN
+    if (user.isBlocked) {
+      console.log(`🚫 Blocked user attempted login: ${user.email} - Reason: ${user.blockReason}`);
+      return res.status(403).json({
+        success: false,
+        error: 'Your account has been suspended. Please contact support for assistance.',
+        blocked: true,
+        reason: user.blockReason || 'Account suspended by administrator',
+        blockedAt: user.blockedAt
+      });
+    }
+
     if (!user.isVerified) {
       return res.status(403).json({ 
         error: "Please verify your email first. Check your inbox for the verification code.",
@@ -771,6 +783,213 @@ router.post("/reset-password", async (req, res) => {
     res.status(500).json({ 
       success: false,
       error: "Password reset failed. Please try again." 
+    });
+  }
+});
+
+// ✅ ADMIN ROUTES FOR USER BLOCKING/UNBLOCKING
+
+// Block a user (Admin only)
+router.post("/admin/block-user", async (req, res) => {
+  try {
+    console.log("🔒 Admin block user request received");
+    const { userId, reason, adminId } = req.body;
+
+    if (!userId || !reason) {
+      return res.status(400).json({
+        success: false,
+        error: "User ID and block reason are required"
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found"
+      });
+    }
+
+    if (user.isBlocked) {
+      return res.status(400).json({
+        success: false,
+        error: "User is already blocked"
+      });
+    }
+
+    // Block the user
+    user.isBlocked = true;
+    user.blockReason = reason;
+    user.blockedAt = new Date();
+    user.blockedBy = adminId || "Admin";
+    await user.save();
+
+    console.log(`🚫 User blocked: ${user.email} by ${adminId || "Admin"}`);
+
+    res.json({
+      success: true,
+      message: `User ${user.email} has been blocked successfully`,
+      user: {
+        id: user._id,
+        email: user.email,
+        username: user.username,
+        isBlocked: user.isBlocked,
+        blockReason: user.blockReason,
+        blockedAt: user.blockedAt
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ Block user error:", err);
+    res.status(500).json({
+      success: false,
+      error: "Failed to block user"
+    });
+  }
+});
+
+// Unblock a user (Admin only)
+router.post("/admin/unblock-user", async (req, res) => {
+  try {
+    console.log("🔓 Admin unblock user request received");
+    const { userId, adminId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: "User ID is required"
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found"
+      });
+    }
+
+    if (!user.isBlocked) {
+      return res.status(400).json({
+        success: false,
+        error: "User is not blocked"
+      });
+    }
+
+    // Unblock the user
+    user.isBlocked = false;
+    user.blockReason = null;
+    user.blockedAt = null;
+    user.blockedBy = null;
+    await user.save();
+
+    console.log(`✅ User unblocked: ${user.email} by ${adminId || "Admin"}`);
+
+    res.json({
+      success: true,
+      message: `User ${user.email} has been unblocked successfully`,
+      user: {
+        id: user._id,
+        email: user.email,
+        username: user.username,
+        isBlocked: user.isBlocked
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ Unblock user error:", err);
+    res.status(500).json({
+      success: false,
+      error: "Failed to unblock user"
+    });
+  }
+});
+
+// Get all users with blocking status (Admin only)
+router.get("/admin/users", async (req, res) => {
+  try {
+    console.log("👥 Admin get all users request");
+    
+    const users = await User.find({})
+      .select('-password -otp') // Exclude sensitive fields
+      .sort({ createdAt: -1 });
+
+    const usersWithBlockStatus = users.map(user => ({
+      id: user._id,
+      username: user.username,
+      fullName: user.fullName,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      babyName: user.babyName,
+      babyAge: user.babyAge,
+      babyGender: user.babyGender,
+      isVerified: user.isVerified,
+      isBlocked: user.isBlocked,
+      blockReason: user.blockReason,
+      blockedAt: user.blockedAt,
+      blockedBy: user.blockedBy,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
+    }));
+
+    res.json({
+      success: true,
+      count: usersWithBlockStatus.length,
+      users: usersWithBlockStatus
+    });
+
+  } catch (err) {
+    console.error("❌ Get users error:", err);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch users"
+    });
+  }
+});
+
+// Get user blocking status by ID (Admin only)
+router.get("/admin/user/:userId", async (req, res) => {
+  try {
+    console.log(`👤 Admin get user details request: ${req.params.userId}`);
+    
+    const user = await User.findById(req.params.userId)
+      .select('-password -otp'); // Exclude sensitive fields
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        username: user.username,
+        fullName: user.fullName,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        babyName: user.babyName,
+        babyAge: user.babyAge,
+        babyGender: user.babyGender,
+        isVerified: user.isVerified,
+        isBlocked: user.isBlocked,
+        blockReason: user.blockReason,
+        blockedAt: user.blockedAt,
+        blockedBy: user.blockedBy,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ Get user error:", err);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch user details"
     });
   }
 });
