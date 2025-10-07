@@ -7,6 +7,7 @@ import HomePage from "./components/HomePage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ForgotPasswordPage from "./components/ForgotPasswordPage";
 import SessionManager from "./components/sessionManager";
+import CaretakerDashboard from "./components/CaretakerDashboard";
 
 export default function App() {
   return (
@@ -28,6 +29,9 @@ export default function App() {
           } />
           <Route path="/sessions" element={<SessionManager />}/>
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          
+          {/* Caretaker Dashboard - Standalone */}
+          <Route path="/caretaker" element={<CaretakerDashboard />} />
         </Routes>
       </BrowserRouter>
      </AuthProvider>

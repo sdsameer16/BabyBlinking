@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const backendUrl = "http://localhost:5000/api/auth";
+  const backendUrl = "http://localhost:5001/api";
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -13,9 +13,39 @@ export const AuthProvider = ({ children }) => {
     const token = localStorage.getItem("token");
     if (token) {
       setIsAuthenticated(true);
+      // Start periodic block checking
+      startPeriodicBlockCheck();
     }
     setLoading(false);
   }, []);
+
+  // 🚫 PERIODIC BLOCK CHECK - Check every 30 seconds if user is blocked
+  const startPeriodicBlockCheck = () => {
+    const blockCheckInterval = setInterval(async () => {
+      const token = localStorage.getItem("token");
+      if (!token || !isAuthenticated) {
+        clearInterval(blockCheckInterval);
+        return;
+      }
+
+      try {
+        console.log("🔍 Checking user block status...");
+        const result = await protectedApiRequest('/user/profile');
+        
+        if (!result.success && result.blocked) {
+          console.log("🚫 User is blocked, forcing logout");
+          clearInterval(blockCheckInterval);
+          logout();
+          window.location.href = "/login";
+        }
+      } catch (error) {
+        console.error("❌ Block check error:", error);
+      }
+    }, 30000); // Check every 30 seconds
+
+    // Store interval ID to clear it on logout
+    window.blockCheckInterval = blockCheckInterval;
+  };
 
   // Helper function for API requests with detailed logging
   const apiRequest = async (endpoint, options = {}) => {
@@ -46,6 +76,27 @@ export const AuthProvider = ({ children }) => {
         data = { error: "Invalid response from server" };
       }
 
+      // 🚫 AUTO-LOGOUT BLOCKED USERS
+      if (response.status === 403 && data.blocked) {
+        console.log("🚫 User account blocked, logging out automatically");
+        
+        // Show detailed blocked message before logout
+        const supportEmail = data.supportEmail || 'kinderkare@support.ac.in';
+        const blockedDate = data.blockedAt ? new Date(data.blockedAt).toLocaleDateString() : 'recently';
+        
+        alert(`🚫 Account Blocked by Admin\n\nReason: ${data.reason}\nBlocked on: ${blockedDate}\n\nFor further information please contact:\n📧 ${supportEmail}`);
+        
+        logout();
+        window.location.href = "/login";
+        return { 
+          success: false, 
+          data, 
+          error: data.error,
+          status: response.status,
+          blocked: true
+        };
+      }
+
       if (!response.ok) {
         console.error(`❌ API Error ${response.status}:`, data);
       }
@@ -65,6 +116,22 @@ export const AuthProvider = ({ children }) => {
         details: err.message
       };
     }
+  };
+
+  // Protected API request for authenticated routes
+  const protectedApiRequest = async (endpoint, options = {}) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      return { success: false, error: "No authentication token found", requiresAuth: true };
+    }
+
+    return await apiRequest(endpoint, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        ...options.headers
+      }
+    });
   };
 
   // 1️⃣ Register
@@ -105,7 +172,7 @@ export const AuthProvider = ({ children }) => {
 
     console.log("🧹 Cleaned form data:", cleanedForm);
 
-    return await apiRequest('/register', {
+    return await apiRequest('/auth/register', {
       method: 'POST',
       body: JSON.stringify(cleanedForm)
     });
@@ -129,7 +196,7 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error };
     }
 
-    return await apiRequest('/verify-otp', {
+    return await apiRequest('/auth/verify-otp', {
       method: 'POST',
       body: JSON.stringify({ email, otp })
     });
@@ -145,7 +212,7 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error };
     }
 
-    return await apiRequest('/resend-otp', {
+    return await apiRequest('/auth/resend-otp', {
       method: 'POST',
       body: JSON.stringify({ email })
     });
@@ -162,7 +229,7 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error };
     }
 
-    const result = await apiRequest('/login', {
+    const result = await apiRequest('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password })
     });
@@ -172,6 +239,9 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("token", result.data.token);
       setIsAuthenticated(true);
       setUser(result.data.user);
+      
+      // Start periodic block checking after successful login
+      startPeriodicBlockCheck();
     }
 
     return result;
@@ -183,6 +253,12 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("token");
     setIsAuthenticated(false);
     setUser(null);
+    
+    // Clear block check interval
+    if (window.blockCheckInterval) {
+      clearInterval(window.blockCheckInterval);
+      window.blockCheckInterval = null;
+    }
   };
 
   // 6️⃣ Test connection
@@ -194,7 +270,7 @@ export const AuthProvider = ({ children }) => {
   // 7️⃣ Test email
   const testEmail = async () => {
     console.log("📧 Testing email configuration...");
-    return await apiRequest('/test-email', {
+    return await apiRequest('/auth/test-email', {
       method: 'POST'
     });
   };
@@ -215,7 +291,8 @@ export const AuthProvider = ({ children }) => {
     // Debug methods
     testConnection,
     testEmail,
-    apiRequest
+    apiRequest,
+    protectedApiRequest
   };
 
   return (

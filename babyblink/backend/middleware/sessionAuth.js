@@ -127,7 +127,7 @@ export const verifySession = async (req, res, next) => {
       userId: decoded.userId,
       isActive: true,
       expiresAt: { $gt: new Date() }
-    }).populate('userId', 'username email fullName babyName babyAge babyGender isVerified');
+    }).populate('userId', 'username email fullName babyName babyAge babyGender isVerified isBlocked blockReason blockedAt blockedBy');
 
     if (!session) {
       return res.status(401).json({ 
@@ -142,6 +142,24 @@ export const verifySession = async (req, res, next) => {
       return res.status(401).json({ 
         error: 'User account not found or not verified',
         requiresAuth: true 
+      });
+    }
+
+    // 🚫 CHECK IF USER IS BLOCKED BY ADMIN
+    if (session.userId.isBlocked) {
+      console.log(`🚫 Blocked user attempted to access protected route: ${session.userId.email} - Reason: ${session.userId.blockReason}`);
+      // Invalidate all active sessions for blocked user
+      await Session.updateMany(
+        { userId: session.userId._id, isActive: true },
+        { isActive: false }
+      );
+      return res.status(403).json({
+        success: false,
+        error: 'Your account has been suspended. Please contact support for assistance.',
+        blocked: true,
+        reason: session.userId.blockReason || 'Account suspended by administrator',
+        blockedAt: session.userId.blockedAt,
+        requiresAuth: true
       });
     }
 

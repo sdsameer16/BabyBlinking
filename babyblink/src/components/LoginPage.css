@@ -100,14 +100,139 @@
 
 /* Message styling */
 .message {
-  color: #ff4444;
   font-weight: 600;
-  margin: 10px 0;
+  margin: 15px 0;
   text-align: center;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 10px;
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 15px;
+  border-radius: 12px;
   min-height: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  white-space: pre-line; /* Allow line breaks in blocked messages */
+  line-height: 1.5;
+}
+
+.message.error {
+  color: #dc3545;
+  border-left: 5px solid #dc3545;
+  background: rgba(248, 215, 218, 0.95);
+}
+
+.message.success {
+  color: #28a745;
+  border-left: 5px solid #28a745;
+  background: rgba(212, 237, 218, 0.95);
+}
+
+.message.info {
+  color: #17a2b8;
+  border-left: 5px solid #17a2b8;
+  background: rgba(209, 236, 241, 0.95);
+}
+
+/* Special styling for blocked user messages */
+.message.blocked-message {
+  font-size: 16px;
+  padding: 25px;
+  max-width: 500px;
+  min-width: 400px;
+  border: 3px solid #dc3545;
+  background: linear-gradient(135deg, rgba(248, 215, 218, 0.98), rgba(255, 235, 235, 0.98));
+  animation: gentle-pulse 6s infinite;
+  box-shadow: 0 8px 25px rgba(220, 53, 69, 0.3);
+}
+
+.blocked-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  text-align: left;
+}
+
+.blocked-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+  animation: rotate-warning 4s ease-in-out infinite alternate;
+}
+
+.blocked-text {
+  flex: 1;
+}
+
+.blocked-text strong {
+  display: block;
+  font-size: 20px;
+  color: #721c24;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.blocked-text p {
+  margin: 0 0 15px 0;
+  line-height: 1.6;
+  color: #721c24;
+}
+
+.dismiss-btn {
+  background: linear-gradient(135deg, #dc3545, #c82333);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 10px;
+  font-size: 14px;
+  box-shadow: 0 4px 10px rgba(220, 53, 69, 0.3);
+}
+
+.dismiss-btn:hover {
+  background: linear-gradient(135deg, #c82333, #a71e2a);
+  box-shadow: 0 6px 15px rgba(220, 53, 69, 0.4);
+  transform: translateY(-2px);
+}
+
+.dismiss-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 5px rgba(220, 53, 69, 0.3);
+}
+
+@keyframes gentle-pulse {
+  0%, 100% { 
+    border-color: #dc3545;
+    box-shadow: 0 8px 25px rgba(220, 53, 69, 0.3);
+  }
+  25% {
+    border-color: #e74c3c;
+    box-shadow: 0 8px 25px rgba(231, 76, 60, 0.35);
+  }
+  50% { 
+    border-color: #ff6b6b;
+    box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+  }
+  75% {
+    border-color: #ff8a80;
+    box-shadow: 0 8px 25px rgba(255, 138, 128, 0.35);
+  }
+}
+
+@keyframes rotate-warning {
+  0% { 
+    transform: rotate(-5deg) scale(1); 
+  }
+  25% {
+    transform: rotate(-2deg) scale(1.05);
+  }
+  50% { 
+    transform: rotate(0deg) scale(1.1); 
+  }
+  75% {
+    transform: rotate(2deg) scale(1.05);
+  }
+  100% { 
+    transform: rotate(5deg) scale(1); 
+  }
 }
 
 /* Register link paragraph */

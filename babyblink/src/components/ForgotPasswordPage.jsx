@@ -41,14 +41,13 @@ export default function ForgotPasswordPage() {
     console.log("Sending forgot password request to:", "/api/auth/forgot-password");
     console.log("Request body:", JSON.stringify({ email: form.email }));
     
-   // In ForgotPasswordPage.jsx, update the fetch URL:
-const response = await fetch("http://localhost:5000/api/auth/forgot-password", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({ email: form.email }),
-});
+    const response = await fetch("http://localhost:5001/api/auth/forgot-password", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email: form.email }),
+    });
 
     console.log("Response status:", response.status);
     console.log("Response ok:", response.ok);
@@ -112,7 +111,7 @@ const response = await fetch("http://localhost:5000/api/auth/forgot-password", {
 
   try {
     console.log("Sending reset password request...");
-    const response = await fetch("http://localhost:5000/api/auth/reset-password", {
+    const response = await fetch("http://localhost:5001/api/auth/reset-password", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

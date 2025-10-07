@@ -17,15 +17,23 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [needsVerification, setNeedsVerification] = useState(false);
   const [userEmail, setUserEmail] = useState("");
+  const [isBlocked, setIsBlocked] = useState(false);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const displayMessage = (msg, type = "info") => {
+  const displayMessage = (msg, type = "info", duration = 5000, persistent = false) => {
     setMessage(msg);
     setMessageType(type);
-    setTimeout(() => setMessage(""), 5000);
+    
+    if (persistent) {
+      setIsBlocked(true);
+      // Don't auto-clear for blocked users
+    } else {
+      setIsBlocked(false);
+      setTimeout(() => setMessage(""), duration);
+    }
   };
 
   const handleLogin = async (e) => {
@@ -51,7 +59,18 @@ export default function LoginPage() {
       setTimeout(() => navigate("/home"), 1000);
     } else {
       // Handle different error cases based on your backend response
-      if (result.data && result.data.needsVerification) {
+      if (result.data && result.data.blocked) {
+        // 🚫 BLOCKED USER - Show specific blocked message with support contact
+        const blockedDate = result.data.blockedAt ? new Date(result.data.blockedAt).toLocaleDateString() : 'recently';
+        const supportEmail = result.data.supportEmail || 'kinderkare@support.ac.in';
+        
+        displayMessage(
+          `🚫 You were blocked by admin.\n\nReason: ${result.data.reason}\nBlocked on: ${blockedDate}\n\nFor further information please contact:\n📧 ${supportEmail}`,
+          "error",
+          30000,  // Show for 30 seconds for blocked users
+          true    // Make it persistent until user action
+        );
+      } else if (result.data && result.data.needsVerification) {
         setNeedsVerification(true);
         setUserEmail(result.data.email);
         displayMessage("Please verify your email first. Check your inbox for the verification code.", "info");
@@ -153,8 +172,29 @@ export default function LoginPage() {
         )}
 
         {message && (
-          <div className={`message ${messageType}`}>
-            <p>{message}</p>
+          <div className={`message ${messageType} ${message.includes('blocked by admin') ? 'blocked-message' : ''}`}>
+            {message.includes('blocked by admin') ? (
+              <div className="blocked-content">
+                <div className="blocked-icon">🚫</div>
+                <div className="blocked-text">
+                  <strong>Account Blocked</strong>
+                  <p>{message}</p>
+                  {isBlocked && (
+                    <button 
+                      className="dismiss-btn"
+                      onClick={() => {
+                        setMessage("");
+                        setIsBlocked(false);
+                      }}
+                    >
+                      Understood
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p>{message}</p>
+            )}
           </div>
         )}
 

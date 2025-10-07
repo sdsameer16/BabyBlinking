@@ -407,8 +407,12 @@ router.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body;
 
+    // Validate input
     if (!username || !password) {
-      return res.status(400).json({ error: "Username and password are required" });
+      return res.status(400).json({
+        success: false,
+        error: "Username and password are required"
+      });
     }
 
     // Support login with either username or email
@@ -420,21 +424,44 @@ router.post("/login", async (req, res) => {
     });
 
     if (!user) {
-      return res.status(400).json({ error: "Invalid credentials" });
+      return res.status(401).json({
+        success: false,
+        error: "Invalid email or password"
+      });
     }
 
     if (!user.isVerified) {
-      return res.status(403).json({ 
+      return res.status(403).json({
+        success: false,
         error: "Please verify your email first. Check your inbox for the verification code.",
         needsVerification: true,
         email: user.email
       });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    // 🚫 CHECK IF USER IS BLOCKED BY ADMIN
+    if (user.isBlocked) {
+      console.log(`🚫 Blocked user login attempt: ${user.email} - Reason: ${user.blockReason}`);
+      return res.status(403).json({
+        success: false,
+        error: 'You were blocked by admin. For further information please contact "kinderkare@support.ac.in"',
+        blocked: true,
+        reason: user.blockReason || 'Account suspended by administrator',
+        blockedAt: user.blockedAt,
+        supportEmail: 'kinderkare@support.ac.in',
+        supportMessage: 'For assistance with your blocked account, please email our support team.',
+        contactSupport: true
+      });
+    }
 
-    if (!isMatch) {
-      return res.status(401).json({ error: "Invalid credentials" });
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid email or password"
+      });
     }
 
     // Generate JWT token
@@ -448,7 +475,9 @@ router.post("/login", async (req, res) => {
       { expiresIn: "24h" }
     );
 
-    res.json({ 
+    // Login successful
+    res.json({
+      success: true,
       message: "Login successful", 
       token,
       user: {

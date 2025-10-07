@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caretaker Dashboard - Firebase Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .chat-item {
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        
+        .chat-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .chat-item.selected {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .chat-item.selected code {
+           background-color: rgba(255,255,255,0.2);
+           color: white;
+        }
+        
+        .message-bubble-parent {
+            background: #e5e7eb;
+            color: #374151;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .message-bubble-caretaker {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        
+        @keyframes messageSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .message {
+            animation: messageSlideIn 0.3s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen p-6">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-white mb-2">🍼 Caretaker Dashboard</h1>
+            <p class="text-white/90 text-lg">Real-time Chat System</p>
+        </header>
+
+        <div id="caretaker-id-container" class="max-w-md mx-auto bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl p-8">
+            <h2 class="text-2xl font-bold text-gray-800 text-center mb-2">Caretaker Login</h2>
+            <p class="text-gray-600 text-center mb-6">Enter your ID to view assigned chats.</p>
+            <input type="text" id="caretakerIdInput" class="w-full text-center px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:outline-none" placeholder="e.g., caretaker-jane">
+            <button id="loginBtn" class="w-full mt-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>Login & View Chats</button>
+            <p id="login-error-message" class="text-red-500 text-sm text-center mt-3 h-4"></p>
+        </div>
+
+        <div id="dashboard-container" class="hidden max-w-7xl mx-auto grid lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
+            <!-- Left Panel - Active Chats -->
+            <div class="bg-white rounded-2xl shadow-2xl p-6 flex flex-col">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-semibold text-gray-800">Active Parent Chats</h3>
+                    <p class="text-sm text-gray-500">For: <strong id="displayCaretakerId"></strong></p>
+                </div>
+                
+                <div id="chatsList" class="flex-1 overflow-y-auto space-y-3">
+                    <div class="text-center text-gray-500 py-8">
+                        <div class="animate-spin text-3xl mb-2">🔄</div>
+                        <p class="text-lg">Waiting for parents...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel - Chat Interface -->
+            <div class="lg:col-span-2 bg-white rounded-2xl shadow-2xl flex flex-col">
+                <div id="chatInterface" class="flex-1 flex flex-col">
+                    <div class="no-selection flex-1 flex items-center justify-center p-8">
+                        <div class="text-center text-gray-500">
+                            <div class="text-6xl mb-4 opacity-50">💬</div>
+                            <h3 class="text-2xl font-semibold text-gray-700 mb-2">Select a Parent to Chat</h3>
+                            <p class="text-lg">Choose a parent from the left panel to view messages and respond.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="fixed bottom-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg">
+            <span id="statusIndicator" class="text-sm font-medium">🔄 Connecting...</span>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, addDoc, onSnapshot, query, serverTimestamp, where, orderBy, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // --- CORRECTED CONFIGURATION ---
+        // This now matches the "chtbot-74fc8" project you provided.
+        const firebaseConfig = {
+            apiKey: "AIzaSyCNt3ed_bf4wojnqqdNAueci5JPg3JD920",
+            authDomain: "chtbot-74fc8.firebaseapp.com",
+            projectId: "chtbot-74fc8",
+            storageBucket: "chtbot-74fc8.firebasestorage.app",
+            messagingSenderId: "452786665417",
+            appId: "1:452786665417:web:08ffb8817362130a595a18",
+            measurementId: "G-XN4M4YB2R4"
+        };
+        
+        // This must match the projectId in the config above
+        const appId = 'chtbot-74fc8'; 
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        const caretakerIdContainer = document.getElementById('caretaker-id-container');
+        const dashboardContainer = document.getElementById('dashboard-container');
+        const loginBtn = document.getElementById('loginBtn');
+        const caretakerIdInput = document.getElementById('caretakerIdInput');
+        const displayCaretakerId = document.getElementById('displayCaretakerId');
+        const loginErrorMessage = document.getElementById('login-error-message');
+        const chatsList = document.getElementById('chatsList');
+        const chatInterface = document.getElementById('chatInterface');
+        const statusIndicator = document.getElementById('statusIndicator');
+
+        let currentCaretakerId = null;
+        let selectedParentId = null;
+        let activeUnsubscriber = null;
+
+        function updateStatus(message, type = 'info') {
+            const icons = { success: '🟢', error: '🔴', info: '🔵', loading: '🔄' };
+            statusIndicator.textContent = `${icons[type]} ${message}`;
+        }
+
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return new Date().toLocaleTimeString();
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function formatLastActivity(timestamp) {
+            if (!timestamp) return 'No activity';
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMins / 60);
+            
+            if (diffMins < 1) return 'Just now';
+            if (diffMins < 60) return `${diffMins}m ago`;
+            return `${diffHours}h ago`;
+        }
+        
+        loginBtn.addEventListener('click', async () => {
+            const caretakerId = caretakerIdInput.value.trim();
+            if (!caretakerId) {
+                loginErrorMessage.textContent = "Caretaker ID cannot be empty.";
+                return;
+            }
+
+            const caretakerRef = doc(db, `artifacts/${appId}/public/data/caretakers`, caretakerId);
+            await setDoc(caretakerRef, { id: caretakerId, lastActive: serverTimestamp() }, { merge: true });
+
+            currentCaretakerId = caretakerId;
+            caretakerIdContainer.classList.add('hidden');
+            dashboardContainer.classList.remove('hidden');
+            displayCaretakerId.textContent = currentCaretakerId;
+            listenForAssignedParents();
+        });
+
+        function listenForAssignedParents() {
+            updateStatus(`Listening for parents...`, 'loading');
+            console.log(`Setting up listener for parents assigned to: ${currentCaretakerId}`);
+
+            const parentsRef = collection(db, `artifacts/${appId}/public/data/parents`);
+            const q = query(parentsRef, where("assignedCaretakerId", "==", currentCaretakerId));
+
+            onSnapshot(q, (snapshot) => {
+                console.log(`Received update. Found ${snapshot.size} assigned parents.`);
+                const parents = snapshot.docs.map(doc => ({ ...doc.data(), lastUpdate: doc.data().lastUpdate?.toDate() }));
+                parents.sort((a, b) => (b.lastUpdate || 0) - (a.lastUpdate || 0));
+                
+                displayActiveChats(parents);
+                updateStatus(`Monitoring ${parents.length} chats`, 'success');
+
+            }, (error) => {
+                console.error("ERROR: Failed to fetch the parent list.", error);
+                updateStatus('Error loading chats', 'error');
+                chatsList.innerHTML = `
+                    <div class="text-center text-red-600 bg-red-100 p-4 rounded-lg">
+                        <p class="font-bold">Database Error</p>
+                        <p class="text-sm mt-1">Could not fetch the parent list. This is often due to a missing Firestore index.</p>
+                        <p class="text-xs mt-2">Please check the browser's developer console for an error message with a link to create the required index.</p>
+                    </div>
+                `;
+            });
+        }
+
+        function displayActiveChats(parents) {
+            if (parents.length === 0) {
+                chatsList.innerHTML = `<div class="text-center text-gray-500 py-8"><p>No parents assigned yet.</p><p class="text-sm">They will appear here automatically.</p></div>`;
+                return;
+            }
+
+            chatsList.innerHTML = parents.map(parent => `
+                <div class="chat-item p-4 rounded-xl bg-gray-50 hover:bg-gray-100 ${selectedParentId === parent.id ? 'selected' : ''}" 
+                     data-parent-id="${parent.id}">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="font-semibold text-lg">👤 ${parent.id}</div>
+                        <div class="text-xs opacity-75">${formatLastActivity(parent.lastUpdate)}</div>
+                    </div>
+                    <p class="text-sm italic text-gray-600 truncate">${parent.lastMessage || 'No messages yet...'}</p>
+                </div>
+            `).join('');
+
+            document.querySelectorAll('.chat-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    selectParent(item.dataset.parentId);
+                });
+            });
+        }
+
+        function selectParent(parentId) {
+            selectedParentId = parentId;
+            document.querySelectorAll('.chat-item').forEach(item => {
+                item.classList.toggle('selected', item.dataset.parentId === parentId);
+            });
+            setupChatInterface(parentId);
+        }
+
+        function setupChatInterface(parentId) {
+            chatInterface.innerHTML = `
+                <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-t-2xl">
+                    <h3 class="text-xl font-semibold">Chat with: ${parentId}</h3>
+                </div>
+                <div id="messagesContainer" class="flex-1 p-4 overflow-y-auto bg-gray-50">
+                     <div class="animate-spin text-2xl mb-2 text-center">🔄</div>
+                </div>
+                <div class="p-4 bg-white border-t border-gray-200 rounded-b-2xl">
+                    <div class="flex space-x-3">
+                        <input type="text" id="replyInput" placeholder="Reply to ${parentId}..." 
+                               class="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 outline-none">
+                        <button id="sendReplyBtn" class="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3 rounded-full font-medium">
+                            📤 Reply
+                        </button>
+                    </div>
+                </div>
+            `;
+            loadMessagesForParent(parentId);
+
+            const replyInput = document.getElementById('replyInput');
+            const sendReplyBtn = document.getElementById('sendReplyBtn');
+            const sendReply = async () => {
+                const text = replyInput.value.trim();
+                if (!text) return;
+                
+                const messagesRef = collection(db, `artifacts/${appId}/public/data/chats/${parentId}/messages`);
+                try {
+                    replyInput.value = '';
+                    await addDoc(messagesRef, {
+                        text: text,
+                        senderId: currentCaretakerId,
+                        senderType: 'caretaker',
+                        timestamp: serverTimestamp()
+                    });
+                } catch (error) {
+                    console.error('Failed to send reply:', error);
+                }
+            };
+            sendReplyBtn.addEventListener('click', sendReply);
+            replyInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendReply(); });
+        }
+
+        function loadMessagesForParent(parentId) {
+            if (activeUnsubscriber) activeUnsubscriber();
+            
+            const messagesContainer = document.getElementById('messagesContainer');
+            const messagesRef = collection(db, `artifacts/${appId}/public/data/chats/${parentId}/messages`);
+            const q = query(messagesRef, orderBy('timestamp', 'asc'));
+
+            activeUnsubscriber = onSnapshot(q, (snapshot) => {
+                const messages = snapshot.docs.map(doc => doc.data());
+                if (messages.length === 0) {
+                    messagesContainer.innerHTML = '<div class="text-center text-gray-500 py-8"><p>No messages from this parent yet</p></div>';
+                    return;
+                }
+                messagesContainer.innerHTML = messages.map(msg => `
+                    <div class="message mb-4 flex ${msg.senderType === 'caretaker' ? 'justify-end' : 'justify-start'}">
+                        <div class="max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${msg.senderType === 'parent' ? 'message-bubble-parent' : 'message-bubble-caretaker'}">
+                            <p class="text-sm">${msg.text}</p>
+                            <div class="text-xs opacity-75 mt-1 ${msg.senderType === 'caretaker' ? 'text-right' : 'text-left'}">${formatTimestamp(msg.timestamp)}</div>
+                        </div>
+                    </div>
+                `).join('');
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }, (error) => {
+                console.error("Error loading messages:", error);
+                messagesContainer.innerHTML = `<div class="text-center text-red-500">Could not load messages.</div>`
+            });
+        }
+        
+        function authHandler() {
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    // User is signed in.
+                    console.log("Firebase Auth: User is signed in.", user.uid);
+                    updateStatus('Connected', 'success');
+                    loginBtn.disabled = false;
+                    loginBtn.textContent = 'Login & View Chats';
+                } else {
+                    // User is signed out, attempt to sign in anonymously.
+                    console.log("Firebase Auth: No user found, attempting anonymous sign-in.");
+                    updateStatus('Authenticating...', 'loading');
+                    signInAnonymously(auth).catch((error) => {
+                        // This catch block will handle the "auth/configuration-not-found" error.
+                        console.error("Firebase Auth: Anonymous sign-in failed.", error);
+                        updateStatus('Connection Failed', 'error');
+                        loginErrorMessage.textContent = 'Auth failed: Check Firebase settings.';
+                        loginBtn.disabled = true;
+                    });
+                }
+            });
+        }
+
+        // Disable login button initially and try to authenticate
+        loginBtn.disabled = true;
+        loginBtn.textContent = 'Connecting...';
+        authHandler();
+    </script>
+</body>
+</html>
+

@@ -10,7 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "agora-rtc-sdk": "^3.6.11",
+    "agora-rtc-sdk-ng": "^4.24.0",
     "axios": "^1.12.2",
+    "firebase": "^12.3.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.9.1"
