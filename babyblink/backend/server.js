@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/user.js';
+import parentsRouter from './routes/parents.js';
 
 // Load environment variables FIRST
 dotenv.config();
@@ -20,8 +21,10 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware with error handling
+// Allow frontend origin (use FRONTEND_URL env var or default to Vite dev server)
+const frontendOrigin = process.env.FRONTEND_URL || process.env.CORS_ORIGIN || 'http://localhost:5173';
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+  origin: frontendOrigin,
   credentials: true
 }));
 
@@ -65,6 +68,8 @@ app.get('/api/health', (req, res) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
+// Parents routes (parent emergency info)
+app.use('/api/parents', parentsRouter);
 
 // Catch-all for undefined routes
 app.use('*', (req, res) => {
@@ -82,6 +87,8 @@ app.use('*', (req, res) => {
       'POST /api/auth/test-email',
       'POST /api/auth/forgot-password',
       'POST /api/auth/reset-password',
+      'POST /api/parents/parent-info/:parentId',
+      'GET  /api/parents/parent-info/:parentId',
       'GET /api/user/profile',
       'PUT /api/user/profile',
       'GET /api/user/dashboard'

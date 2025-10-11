@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ChatService from '../utils/chatService';
+import { db } from '../config/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { useAuth } from '../contexts/AuthContext';
 import './CaretakerDashboard.css';
 
 const CaretakerDashboard = () => {
@@ -11,6 +14,7 @@ const CaretakerDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [emergencyInfo, setEmergencyInfo] = useState(null);
 
   const messagesEndRef = useRef(null);
   const unsubscribeRef = useRef(null);
@@ -55,13 +59,12 @@ const CaretakerDashboard = () => {
       
     } catch (error) {
       console.error('❌ Failed to load active chats:', error);
-      setError('Failed to load active chats. Please refresh.');
     } finally {
       setRefreshing(false);
     }
   };
 
-  const selectParent = (parentInfo) => {
+  const selectParent = async (parentInfo) => {
     try {
       // Validate parentInfo
       if (!parentInfo || !parentInfo.parentId || parentInfo.parentId.trim() === '') {
@@ -82,6 +85,10 @@ const CaretakerDashboard = () => {
 
       console.log(`🔄 Selecting parent: ${parentInfo.parentId} (${parentInfo.babyName})`);
 
+      // Fetch emergency info for this parent
+      const emergencyData = await fetchEmergencyInfo(parentInfo.parentId);
+      setEmergencyInfo(emergencyData);
+
       // Start listening to messages for this parent
       const unsubscribe = ChatService.listenToMessages(parentInfo.parentId, (newMessages) => {
         setMessages(newMessages);
@@ -95,6 +102,36 @@ const CaretakerDashboard = () => {
       console.error('❌ Failed to select parent:', error);
       setError('Failed to load messages for this parent.');
       setLoading(false);
+    }
+  };
+
+  const { protectedApiRequest } = useAuth();
+
+  // Fetch parent emergency info from Firestore
+  const fetchEmergencyInfo = async (parentId) => {
+    try {
+      if (!parentId) {
+        setEmergencyInfo(null);
+        return null;
+      }
+      const docRef = doc(db, 'emergencyInfo', parentId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        const formattedData = {
+          doctorName: data.pediatrician || '',
+          hospital: data.hospital || '',
+          parentPhone: data.emergencyNumber || ''
+        };
+        setEmergencyInfo(formattedData);
+        return formattedData;
+      }
+      setEmergencyInfo(null);
+      return null;
+    } catch (error) {
+      console.error('🔥 Error fetching emergency info from Firestore:', error);
+      setEmergencyInfo(null);
+      return null;
     }
   };
 
@@ -224,17 +261,35 @@ const CaretakerDashboard = () => {
             </div>
           ) : (
             <>
-              <div className="chat-header">
-                <div className="selected-parent-info">
-                  <h3>👶 {selectedParent.babyName}</h3>
-                  <span className="parent-id-small">Parent: {selectedParent.parentId}</span>
+              <div className="chat-container">
+                <div className="chat-header">
+                  <div className="parent-info">
+                    <h3>Chat with {selectedParent.parentName || 'Parent'}</h3>
+                    <div className="chat-stats">
+                      <span>{messages.length} messages</span>
+                    </div>
+                  </div>
+                  {emergencyInfo && (
+                    <div className="emergency-info-panel">
+                      <h4>Emergency Information</h4>
+                      <div className="emergency-details">
+                        {emergencyInfo.doctorName && (
+                          <p><strong>Doctor:</strong> {emergencyInfo.doctorName}</p>
+                        )}
+                        {emergencyInfo.hospital && (
+                          <p><strong>Hospital:</strong> {emergencyInfo.hospital}</p>
+                        )}
+                        {emergencyInfo.parentPhone && (
+                          <p><strong>Parent's Phone:</strong> {emergencyInfo.parentPhone}</p>
+                        )}
+                        {!emergencyInfo.doctorName && !emergencyInfo.hospital && !emergencyInfo.parentPhone && (
+                          <p>No emergency information provided by parent.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="chat-stats">
-                  <span>{messages.length} messages</span>
-                </div>
-              </div>
-
-              <div className="messages-container">
+                <div className="messages-container">
                 {loading ? (
                   <div className="loading-messages">
                     <div className="loading-spinner">🔄</div>
@@ -275,7 +330,6 @@ const CaretakerDashboard = () => {
                   ⚠️ {error}
                 </div>
               )}
-
               <div className="reply-container">
                 <input
                   type="text"
@@ -294,9 +348,10 @@ const CaretakerDashboard = () => {
                   📤 Reply
                 </button>
               </div>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
+      </div>
       </div>
     </div>
   );

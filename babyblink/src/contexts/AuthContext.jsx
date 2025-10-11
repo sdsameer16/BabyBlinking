@@ -3,7 +3,11 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const backendUrl = "http://localhost:5001/api";
+  // Prefer Vite env var, allow optional window override for dynamic configs, fallback to localhost:5000
+  const backendUrl =
+    (typeof window !== 'undefined' && window.__API_BASE__) ||
+    (import.meta && import.meta.env && import.meta.env.VITE_API_URL) ||
+    `http://localhost:${(import.meta && import.meta.env && import.meta.env.VITE_API_PORT) || 5000}/api`;
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);

@@ -82,7 +82,12 @@
             <div class="bg-white rounded-2xl shadow-2xl p-6 flex flex-col">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-xl font-semibold text-gray-800">Active Parent Chats</h3>
-                    <p class="text-sm text-gray-500">For: <strong id="displayCaretakerId"></strong></p>
+                        <div class="flex items-center space-x-3">
+                            <p class="text-sm text-gray-500">For: <strong id="displayCaretakerId"></strong></p>
+                            <!-- Backend URL & Token for protected API access -->
+                            <input id="backendUrlInput" class="text-xs px-2 py-1 border rounded" placeholder="Backend base (http://localhost:5000)" style="width:220px" value="http://localhost:5000">
+                            <input id="tokenInput" class="text-xs px-2 py-1 border rounded" placeholder="Paste JWT token" style="width:300px">
+                        </div>
                 </div>
                 
                 <div id="chatsList" class="flex-1 overflow-y-auto space-y-3">
@@ -116,7 +121,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, addDoc, onSnapshot, query, serverTimestamp, where, orderBy, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, addDoc, onSnapshot, query, serverTimestamp, where, orderBy, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // --- CORRECTED CONFIGURATION ---
         // This now matches the "chtbot-74fc8" project you provided.
@@ -255,7 +260,12 @@
         function setupChatInterface(parentId) {
             chatInterface.innerHTML = `
                 <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-t-2xl">
-                    <h3 class="text-xl font-semibold">Chat with: ${parentId}</h3>
+                                        <div class="flex items-center justify-between">
+                                            <h3 class="text-xl font-semibold">Chat with: ${parentId}</h3>
+                                            <div class="flex items-center space-x-3">
+                                                <button id="fetchEmergencyBtn" class="bg-yellow-400 text-black px-3 py-1 rounded">🔎 Get Emergency Info</button>
+                                            </div>
+                                        </div>
                 </div>
                 <div id="messagesContainer" class="flex-1 p-4 overflow-y-auto bg-gray-50">
                      <div class="animate-spin text-2xl mb-2 text-center">🔄</div>
@@ -272,13 +282,47 @@
             `;
             loadMessagesForParent(parentId);
 
+                        // Hook up emergency info button
+                        setTimeout(() => {
+                            const fetchEmergencyBtn = document.getElementById('fetchEmergencyBtn');
+                            if (fetchEmergencyBtn) {
+                                fetchEmergencyBtn.onclick = async () => {
+                                    try {
+                                        updateStatus('Fetching emergency info...', 'loading');
+                                        console.log('[Caretaker] Loading emergency info from Firestore for', parentId);
+                                        const infoRef = doc(db, 'emergencyInfo', parentId);
+                                        const snap = await getDoc(infoRef);
+                                        if (snap.exists()) {
+                                            const data = snap.data();
+                                            console.log('[Caretaker] Emergency info:', data);
+                                            // Map Firestore fields to UI expectation
+                                            showEmergencyInfo({
+                                                pediatrician: data.pediatrician || '',
+                                                hospital: data.hospital || '',
+                                                emergencyNumber: data.emergencyNumber || '',
+                                                updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt
+                                            });
+                                            updateStatus('Emergency info loaded', 'success');
+                                        } else {
+                                            console.warn('[Caretaker] No emergency info found for', parentId);
+                                            showEmergencyInfo(null);
+                                            updateStatus('No emergency info', 'info');
+                                        }
+                                    } catch (err) {
+                                        console.error('Error fetching emergency info from Firestore', err);
+                                        updateStatus('Error loading emergency info', 'error');
+                                    }
+                                };
+                            }
+                        }, 50);
+
             const replyInput = document.getElementById('replyInput');
             const sendReplyBtn = document.getElementById('sendReplyBtn');
             const sendReply = async () => {
                 const text = replyInput.value.trim();
                 if (!text) return;
                 
-                const messagesRef = collection(db, `artifacts/${appId}/public/data/chats/${parentId}/messages`);
+                const messagesRef = collection(db, `chats/${parentId}/messages`);
                 try {
                     replyInput.value = '';
                     await addDoc(messagesRef, {
@@ -299,7 +343,7 @@
             if (activeUnsubscriber) activeUnsubscriber();
             
             const messagesContainer = document.getElementById('messagesContainer');
-            const messagesRef = collection(db, `artifacts/${appId}/public/data/chats/${parentId}/messages`);
+            const messagesRef = collection(db, `chats/${parentId}/messages`);
             const q = query(messagesRef, orderBy('timestamp', 'asc'));
 
             activeUnsubscriber = onSnapshot(q, (snapshot) => {
@@ -344,6 +388,33 @@
                     });
                 }
             });
+        }
+
+        // Show emergency info in the UI
+        function showEmergencyInfo(info) {
+            const messagesContainer = document.getElementById('messagesContainer');
+            if (!messagesContainer) return;
+
+            const existing = document.getElementById('emergencyInfoBox');
+            if (existing) existing.remove();
+
+            const box = document.createElement('div');
+            box.id = 'emergencyInfoBox';
+            box.className = 'p-4 bg-white border rounded-lg mb-4';
+
+            if (!info) {
+                box.innerHTML = '<div class="text-sm text-gray-600">No emergency info available for this parent.</div>';
+            } else {
+                box.innerHTML = `
+                    <h4 class="font-semibold mb-2">🚨 Emergency Info</h4>
+                    <div class="text-sm text-gray-700"><strong>Doctor:</strong> ${info.pediatrician || '—'}</div>
+                    <div class="text-sm text-gray-700"><strong>Hospital:</strong> ${info.hospital || '—'}</div>
+                    <div class="text-sm text-gray-700"><strong>Mobile Number:</strong> ${info.emergencyNumber || '—'}</div>
+                    <div class="text-xs text-gray-500 mt-2">Last updated: ${info.updatedAt ? new Date(info.updatedAt).toLocaleString() : '—'}</div>
+                `;
+            }
+
+            messagesContainer.prepend(box);
         }
 
         // Disable login button initially and try to authenticate

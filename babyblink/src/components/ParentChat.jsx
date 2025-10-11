@@ -38,7 +38,14 @@ const db = getFirestore(app);
 const appId = 'chtbot-74fc8';
 
 const ParentChat = ({ isVisible = true, className = '' }) => {
-    const [parentId, setParentId] = useState('');
+    const [parentId, setParentId] = useState(() => {
+        try {
+            const saved = localStorage.getItem('parentId');
+            return saved || '';
+        } catch {
+            return '';
+        }
+    });
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
@@ -66,7 +73,7 @@ const ParentChat = ({ isVisible = true, className = '' }) => {
     
     useEffect(() => {
         if (isLoggedIn && assignedCaretakerId) {
-            const messagesRef = collection(db, `artifacts/${appId}/public/data/chats/${parentId}/messages`);
+            const messagesRef = collection(db, `chats/${parentId}/messages`);
             const q = query(messagesRef, orderBy('timestamp', 'asc'));
 
             const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -129,6 +136,7 @@ const ParentChat = ({ isVisible = true, className = '' }) => {
                  console.log(`Parent ${currentParentId} has been assigned to caretaker ${caretakerId}`);
             }
 
+            try { localStorage.setItem('parentId', currentParentId); } catch {}
             setAssignedCaretakerId(caretakerId);
             setIsLoggedIn(true);
         } catch (err) {
@@ -144,7 +152,7 @@ const ParentChat = ({ isVisible = true, className = '' }) => {
         const text = newMessage.trim();
         if (!text) return;
 
-        const messagesRef = collection(db, `artifacts/${appId}/public/data/chats/${parentId}/messages`);
+        const messagesRef = collection(db, `chats/${parentId}/messages`);
         const parentRef = doc(db, `artifacts/${appId}/public/data/parents`, parentId);
         
         try {
@@ -179,7 +187,7 @@ const ParentChat = ({ isVisible = true, className = '' }) => {
                     type="text"
                     value={parentId}
                     onChange={(e) => setParentId(e.target.value)}
-                    placeholder="Enter your Parent ID"
+                    placeholder="Enter your Child Name "
                     className="w-full px-3 py-2 border rounded-md mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     disabled={isLoading}
                 />
@@ -192,31 +200,31 @@ const ParentChat = ({ isVisible = true, className = '' }) => {
     }
 
     return (
-        <div className="h-full flex flex-col bg-white rounded-lg">
-            <div className="p-3 bg-gray-100 border-b rounded-t-lg">
-                <h4 className="font-bold text-center text-gray-800">Chat with Caretaker</h4>
-                <p className="text-xs text-center text-gray-500">You are: {parentId}</p>
+        <div className="parent-chat-container h-full flex flex-col rounded-lg">
+            <div className="chat-header">
+                <h4 className="font-bold text-center">Chat with Caretaker</h4>
+                <p className="text-xs text-center">You are: {parentId}</p>
             </div>
-            <div className="flex-1 p-3 overflow-y-auto bg-gray-50">
+            <div className="messages-container">
                 {messages.map((msg) => (
-                    <div key={msg.id} className={`flex my-2 ${msg.senderType === 'parent' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`px-3 py-2 rounded-lg max-w-xs ${msg.senderType === 'parent' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'}`}>
-                           <p className="text-sm">{msg.text}</p>
+                    <div key={msg.id} className={`message ${msg.senderType === 'parent' ? 'from-parent' : 'from-caretaker'}`}>
+                        <div className="message-content">
+                           <p className="message-text">{msg.text}</p>
                         </div>
                     </div>
                 ))}
                 <div ref={messagesEndRef} />
             </div>
-            <form onSubmit={handleSendMessage} className="p-3 border-t bg-gray-100 rounded-b-lg">
+            <form onSubmit={handleSendMessage} className="message-input-container">
                 <div className="flex items-center">
                     <input
                         type="text"
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                         placeholder="Type your message..."
-                        className="flex-1 px-3 py-2 border rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="message-input"
                     />
-                    <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-r-md hover:bg-blue-700">Send</button>
+                    <button type="submit" className="send-button">Send</button>
                 </div>
             </form>
         </div>
