@@ -82,7 +82,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <div className="footer">
-        <p>© 2024 BabyBlink. All rights reserved. | Safe, Secure, and Loved by Parents Worldwide</p>
+        <p>© 2025 BabyBlink. All rights reserved. | Safe, Secure, and Loved by Parents Worldwide</p>
       </div>
     </div>
   );

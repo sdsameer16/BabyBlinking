@@ -1,234 +1,180 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { 
-    getFirestore, 
-    collection, 
-    doc, 
-    addDoc, 
-    onSnapshot, 
-    query, 
-    orderBy, 
-    serverTimestamp, 
-    getDoc, 
-    getDocs,
-    setDoc,
-    limit
-} from 'firebase/firestore';
-import './ParentChat.css';
+import React, { useState, useEffect, useRef } from "react";
+import { io } from "socket.io-client";
+import axios from "axios";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
-// --- CORRECTED CONFIGURATION ---
-// This now matches your "chtbot-74fc8" project and the caretaker app.
-const firebaseConfig = {
-    apiKey: "AIzaSyCNt3ed_bf4wojnqqdNAueci5JPg3JD920",
-    authDomain: "chtbot-74fc8.firebaseapp.com",
-    projectId: "chtbot-74fc8",
-    storageBucket: "chtbot-74fc8.firebasestorage.app",
-    messagingSenderId: "452786665417",
-    appId: "1:452786665417:web:08ffb8817362130a595a18",
-    measurementId: "G-XN4M4YB2R4"
-};
+const socket = io("https://livechatapp-1-7362.onrender.com");
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+const ParentChat = () => {
+  const [parentName, setParentName] = useState("");
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [message, setMessage] = useState("");
+  const [chat, setChat] = useState([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const messagesEndRef = useRef(null);
 
-// This must match the projectId in the config above and in the caretaker app
-const appId = 'chtbot-74fc8';
-
-const ParentChat = ({ isVisible = true, className = '' }) => {
-    const [parentId, setParentId] = useState(() => {
-        try {
-            const saved = localStorage.getItem('parentId');
-            return saved || '';
-        } catch {
-            return '';
-        }
-    });
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const [messages, setMessages] = useState([]);
-    const [newMessage, setNewMessage] = useState('');
-    const [assignedCaretakerId, setAssignedCaretakerId] = useState(null);
-    const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(true);
-    const messagesEndRef = useRef(null);
-
-    useEffect(() => {
-        // Authenticate the user anonymously when the component mounts
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                console.log("Parent Auth: User is signed in.", user.uid);
-                setError('');
-                setIsLoading(false);
-            } else {
-                signInAnonymously(auth).catch((err) => {
-                    console.error("Parent Auth: Anonymous sign-in failed.", err);
-                    setError('Firebase connection failed. Please refresh.');
-                    setIsLoading(false);
-                });
-            }
-        });
-    }, []);
-    
-    useEffect(() => {
-        if (isLoggedIn && assignedCaretakerId) {
-            const messagesRef = collection(db, `chats/${parentId}/messages`);
-            const q = query(messagesRef, orderBy('timestamp', 'asc'));
-
-            const unsubscribe = onSnapshot(q, (snapshot) => {
-                const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setMessages(msgs);
-            }, (err) => {
-                console.error("Failed to fetch messages:", err);
-                setError("Could not load messages.");
-            });
-
-            return () => unsubscribe();
-        }
-    }, [isLoggedIn, parentId, assignedCaretakerId]);
-
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
-
-    const handleLogin = async () => {
-        const currentParentId = parentId.trim();
-        if (!currentParentId) {
-            setError('Parent ID cannot be empty.');
-            return;
-        }
-        
-        setIsLoading(true);
-        setError('');
-
-        try {
-            const parentRef = doc(db, `artifacts/${appId}/public/data/parents`, currentParentId);
-            const parentSnap = await getDoc(parentRef);
-
-            let caretakerId;
-
-            if (parentSnap.exists() && parentSnap.data().assignedCaretakerId) {
-                caretakerId = parentSnap.data().assignedCaretakerId;
-                console.log(`Parent ${currentParentId} already assigned to ${caretakerId}`);
-            } else {
-                console.log(`Assigning a new caretaker for parent ${currentParentId}`);
-                const caretakersRef = collection(db, `artifacts/${appId}/public/data/caretakers`);
-                const q = query(caretakersRef, orderBy('lastActive', 'desc'), limit(5));
-                const caretakerSnapshot = await getDocs(q);
-
-                if (caretakerSnapshot.empty) {
-                    setError('No active caretakers available. Please try again later.');
-                    setIsLoading(false);
-                    return;
-                }
-                
-                // For simplicity, assign to the most recently active caretaker.
-                // A real-world scenario might involve more complex load balancing.
-                caretakerId = caretakerSnapshot.docs[0].id;
-
-                await setDoc(parentRef, { 
-                    id: currentParentId, 
-                    assignedCaretakerId: caretakerId,
-                    lastUpdate: serverTimestamp()
-                }, { merge: true });
-
-                 console.log(`Parent ${currentParentId} has been assigned to caretaker ${caretakerId}`);
-            }
-
-            try { localStorage.setItem('parentId', currentParentId); } catch {}
-            setAssignedCaretakerId(caretakerId);
-            setIsLoggedIn(true);
-        } catch (err) {
-            console.error("Login or assignment failed:", err);
-            setError("Failed to log in or find a caretaker. Check console for details.");
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    
-    const handleSendMessage = async (e) => {
-        e.preventDefault();
-        const text = newMessage.trim();
-        if (!text) return;
-
-        const messagesRef = collection(db, `chats/${parentId}/messages`);
-        const parentRef = doc(db, `artifacts/${appId}/public/data/parents`, parentId);
-        
-        try {
-            setNewMessage('');
-            await addDoc(messagesRef, {
-                text: text,
-                senderId: parentId,
-                senderType: 'parent',
-                timestamp: serverTimestamp(),
-            });
-
-            // Update parent document with last message for caretaker's view
-            await setDoc(parentRef, {
-                lastMessage: text,
-                lastUpdate: serverTimestamp()
-            }, { merge: true });
-
-        } catch (err) {
-            console.error('Failed to send message:', err);
-            setError('Could not send message.');
-        }
-    };
-
-    if (!isVisible) return null;
-
-    if (!isLoggedIn) {
-        return (
-            <div className="p-4 bg-gray-100 rounded-lg h-full flex flex-col items-center justify-center">
-                <h4 className="font-bold text-lg mb-2 text-gray-800">Parent Live Chat</h4>
-                <p className="text-sm text-gray-600 mb-4">Enter a unique ID to start chatting.</p>
-                <input
-                    type="text"
-                    value={parentId}
-                    onChange={(e) => setParentId(e.target.value)}
-                    placeholder="Enter your Child Name "
-                    className="w-full px-3 py-2 border rounded-md mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={isLoading}
-                />
-                <button onClick={handleLogin} disabled={isLoading} className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition disabled:opacity-50">
-                    {isLoading ? 'Connecting...' : 'Login'}
-                </button>
-                {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
-            </div>
-        );
+  const handleRegister = () => {
+    if (!parentName.trim()) {
+      toast.error("Please enter a parent name");
+      return;
     }
+    setIsRegistered(true);
+  };
 
+  useEffect(() => {
+    if (isRegistered && parentName) {
+      // Register with the backend
+      socket.emit("register", { role: "parent", parentId: parentName });
+
+      // Load messages for this parent
+      axios.get(`https://livechatapp-1-7362.onrender.com/messages/${parentName}`).then((res) => {
+        setChat(res.data);
+      });
+
+      // Listen for messages for this parent
+      socket.on("receiveFromCaretaker", (data) => {
+        setChat((prev) => [...prev, { sender: "caretaker", message: data.message, timestamp: new Date() }]);
+        toast.info("New message from caretaker!");
+        playNotification();
+      });
+
+      socket.on("typingFromCaretaker", () => {
+        setIsTyping(true);
+        setTimeout(() => setIsTyping(false), 2000);
+      });
+
+      return () => {
+        socket.off("receiveFromCaretaker");
+        socket.off("typingFromCaretaker");
+      };
+    }
+  }, [isRegistered, parentName]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chat]);
+
+  const playNotification = () => {
+    new Audio("/notification.mp3").play();
+  };
+
+  const handleTyping = () => {
+    if (isRegistered) {
+      socket.emit("typing", { role: "parent", parentId: parentName });
+    }
+  };
+
+  const sendMessage = () => {
+    if (!message.trim() || !isRegistered) return;
+    socket.emit("parentMessage", { parentId: parentName, message });
+    setChat((prev) => [...prev, { sender: "parent", message, timestamp: new Date() }]);
+    setMessage("");
+  };
+
+  // Show registration form if not registered
+  if (!isRegistered) {
     return (
-        <div className="parent-chat-container h-full flex flex-col rounded-lg">
-            <div className="chat-header">
-                <h4 className="font-bold text-center">Chat with Caretaker</h4>
-                <p className="text-xs text-center">You are: {parentId}</p>
-            </div>
-            <div className="messages-container">
-                {messages.map((msg) => (
-                    <div key={msg.id} className={`message ${msg.senderType === 'parent' ? 'from-parent' : 'from-caretaker'}`}>
-                        <div className="message-content">
-                           <p className="message-text">{msg.text}</p>
-                        </div>
-                    </div>
-                ))}
-                <div ref={messagesEndRef} />
-            </div>
-            <form onSubmit={handleSendMessage} className="message-input-container">
-                <div className="flex items-center">
-                    <input
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Type your message..."
-                        className="message-input"
-                    />
-                    <button type="submit" className="send-button">Send</button>
-                </div>
-            </form>
-        </div>
+      <div style={{ width: 400, margin: "auto", padding: 20, fontFamily: "Poppins", textAlign: "center" }}>
+        <h3>👩‍👦 Parent Registration</h3>
+        <p>Please enter your name to start chatting with the caretaker</p>
+
+        <input
+          type="text"
+          value={parentName}
+          onChange={(e) => setParentName(e.target.value)}
+          placeholder="Enter your name (e.g., John Smith)"
+          style={{
+            width: "80%",
+            padding: 10,
+            borderRadius: 20,
+            border: "2px solid #ddd",
+            marginBottom: 20,
+            fontSize: 16
+          }}
+        />
+
+        <br />
+
+        <button
+          onClick={handleRegister}
+          style={{
+            padding: "10px 30px",
+            backgroundColor: "#4CAF50",
+            color: "white",
+            border: "none",
+            borderRadius: 20,
+            cursor: "pointer",
+            fontSize: 16
+          }}
+        >
+          Start Chatting
+        </button>
+
+        <ToastContainer position="bottom-right" />
+      </div>
     );
+  }
+
+  return (
+    <div style={{ width: 500, margin: "auto", padding: 20, fontFamily: "Poppins" }}>
+      <h3>👩‍👦 Parent Chat</h3>
+
+      <div style={{ marginBottom: 20, fontSize: 18, fontWeight: "bold", color: "#333" }}>
+        Logged in as: <span style={{ color: "#4CAF50" }}>{parentName}</span>
+      </div>
+
+      <div
+        style={{
+          border: "1px solid gray",
+          height: 350,
+          overflowY: "scroll",
+          padding: 10,
+          borderRadius: 10,
+          marginBottom: 10,
+          background: "#f9f9f9",
+        }}
+      >
+        {chat.map((msg, i) => (
+          <div
+            key={i}
+            style={{
+              textAlign: msg.sender === "parent" ? "right" : "left",
+              marginBottom: "8px",
+            }}
+          >
+            <div
+              style={{
+                display: "inline-block",
+                padding: "8px 12px",
+                borderRadius: 15,
+                background: msg.sender === "parent" ? "#DCF8C6" : "#EAEAEA",
+                color: "black",
+              }}
+            >
+              {msg.message}
+            </div>
+            <div style={{ fontSize: "10px", color: "black" }}>
+              {new Date(msg.timestamp).toLocaleTimeString()}
+            </div>
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {isTyping && <div style={{ color: "black" }}>Caretaker is typing...</div>}
+
+      <input
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        onKeyPress={handleTyping}
+        placeholder="Type message..."
+        style={{ width: "70%", borderRadius: 20, padding: 8 }}
+      />
+      <button onClick={sendMessage}>Send</button>
+      <ToastContainer position="bottom-right" />
+    </div>
+  );
 };
 
 export default ParentChat;
