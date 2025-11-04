@@ -8,13 +8,13 @@ const router = express.Router();
 router.post('/parent-info/:parentId', authenticateAndCheckBlock, async (req, res) => {
   try {
     const { parentId } = req.params;
-    const { pediatrician, emergencyNumber, poisonControl, hospital } = req.body;
+    const { pediatrician, emergencyNumber, poisonControl } = req.body;
 
     if (!parentId) return res.status(400).json({ success: false, error: 'parentId required' });
 
     const updated = await ParentInfo.findOneAndUpdate(
       { parentId },
-      { pediatrician, emergencyNumber, poisonControl, hospital, updatedAt: new Date() },
+      { pediatrician, emergencyNumber, poisonControl, updatedAt: new Date() },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 

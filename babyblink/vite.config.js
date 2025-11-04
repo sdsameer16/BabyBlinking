@@ -29,4 +29,19 @@ export default defineConfig({
   optimizeDeps: {
     include: ['simple-peer', 'buffer', 'process']
   }
+
+    ,
+    // Dev server proxy to avoid CORS when calling the deployed backend during local development
+    server: {
+      proxy: {
+        // Proxy any /api requests to the deployed backend so browser treats them as same-origin
+        '/api': {
+          target: 'https://babyblinking.onrender.com',
+          changeOrigin: true,
+          secure: true,
+          rewrite: (path) => path.replace(/^\/api/, '/api')
+        }
+      }
+    }
+
 })

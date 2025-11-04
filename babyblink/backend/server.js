@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/user.js';
 import parentsRouter from './routes/parents.js';
+import emergencyRoutes from './routes/emergency.js';
 
 // Load environment variables FIRST
 dotenv.config();
@@ -22,7 +23,7 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware with error handling
 // Allow frontend origin (use FRONTEND_URL env var or default to Vite dev server)
-const frontendOrigin = process.env.FRONTEND_URL || process.env.CORS_ORIGIN || 'http://localhost:5173';
+const frontendOrigin = process.env.FRONTEND_URL || process.env.CORS_ORIGIN || 'https://babyblinking.onrender.com';
 app.use(cors({
   origin: frontendOrigin,
   credentials: true
@@ -70,6 +71,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 // Parents routes (parent emergency info)
 app.use('/api/parents', parentsRouter);
+// Emergency routes (separate collections)
+app.use('/api/emergency', emergencyRoutes);
 
 // Catch-all for undefined routes
 app.use('*', (req, res) => {
@@ -172,10 +175,10 @@ const startServer = async () => {
     const server = app.listen(PORT, () => {
       console.log('\n🚀 =================================');
       console.log(`🌟 Server running on port ${PORT}`);
-      console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
-      console.log(`📧 Email test: http://localhost:${PORT}/api/auth/test-email`);
-      console.log(`📝 Register: http://localhost:${PORT}/api/auth/register`);
-      console.log(`🔐 Login: http://localhost:${PORT}/api/auth/login`);
+  console.log(`🌐 Health check: https://babyblinking.onrender.com/api/health`);
+  console.log(`📧 Email test: https://babyblinking.onrender.com/api/auth/test-email`);
+  console.log(`📝 Register: https://babyblinking.onrender.com/api/auth/register`);
+  console.log(`🔐 Login: https://babyblinking.onrender.com/api/auth/login`);
       console.log('🚀 =================================\n');
     });
 

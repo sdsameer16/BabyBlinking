@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Caretaker Dashboard - Firebase Chat</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { 
@@ -85,7 +86,7 @@
                         <div class="flex items-center space-x-3">
                             <p class="text-sm text-gray-500">For: <strong id="displayCaretakerId"></strong></p>
                             <!-- Backend URL & Token for protected API access -->
-                            <input id="backendUrlInput" class="text-xs px-2 py-1 border rounded" placeholder="Backend base (http://localhost:5000)" style="width:220px" value="http://localhost:5000">
+                            <input id="backendUrlInput" class="text-xs px-2 py-1 border rounded" placeholder="Backend base (https://babyblinking.onrender.com)" style="width:220px" value="https://babyblinking.onrender.com">
                             <input id="tokenInput" class="text-xs px-2 py-1 border rounded" placeholder="Paste JWT token" style="width:300px">
                         </div>
                 </div>
@@ -142,6 +143,10 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         
+        // WebSocket connection for emergency info
+        const socket = io("https://livechatapp-1-7362.onrender.com");
+        let emergencyInfoCache = new Map(); // Cache emergency info by parentId
+        
         const caretakerIdContainer = document.getElementById('caretaker-id-container');
         const dashboardContainer = document.getElementById('dashboard-container');
         const loginBtn = document.getElementById('loginBtn');
@@ -155,6 +160,45 @@
         let currentCaretakerId = null;
         let selectedParentId = null;
         let activeUnsubscriber = null;
+
+        // WebSocket event listeners for emergency info
+        socket.on('emergencyInfo', (data) => {
+            console.log('🚨 Received emergency info via WebSocket:', data);
+            const { parentId, emergencyInfo } = data;
+            
+            // Cache the emergency info
+            emergencyInfoCache.set(parentId, emergencyInfo);
+            
+            // Show notification
+            showEmergencyNotification(parentId, emergencyInfo);
+            
+            // Update status
+            updateStatus(`Emergency info received from ${parentId}`, 'success');
+        });
+
+        function showEmergencyNotification(parentId, emergencyInfo) {
+            // Create a notification element
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-red-500 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm';
+            notification.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="font-bold">🚨 Emergency Info</h4>
+                        <p class="text-sm">From: ${parentId}</p>
+                        <p class="text-xs mt-1">Click on parent name to view details</p>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200">×</button>
+                </div>
+            `;
+            document.body.appendChild(notification);
+            
+            // Auto-remove after 10 seconds
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 10000);
+        }
 
         function updateStatus(message, type = 'info') {
             const icons = { success: '🟢', error: '🔴', info: '🔵', loading: '🔄' };
@@ -231,19 +275,31 @@
                 return;
             }
 
-            chatsList.innerHTML = parents.map(parent => `
-                <div class="chat-item p-4 rounded-xl bg-gray-50 hover:bg-gray-100 ${selectedParentId === parent.id ? 'selected' : ''}" 
-                     data-parent-id="${parent.id}">
-                    <div class="flex justify-between items-start mb-2">
-                        <div class="font-semibold text-lg">👤 ${parent.id}</div>
-                        <div class="text-xs opacity-75">${formatLastActivity(parent.lastUpdate)}</div>
+            chatsList.innerHTML = parents.map(parent => {
+                const hasEmergencyInfo = emergencyInfoCache.has(parent.id);
+                return `
+                    <div class="chat-item p-4 rounded-xl bg-gray-50 hover:bg-gray-100 ${selectedParentId === parent.id ? 'selected' : ''}" 
+                         data-parent-id="${parent.id}">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="font-semibold text-lg cursor-pointer hover:text-blue-600" 
+                                 onclick="showEmergencyInfoForParent('${parent.id}')" 
+                                 title="Click to view emergency info">
+                                👤 ${parent.id} ${hasEmergencyInfo ? '🚨' : ''}
+                            </div>
+                            <div class="text-xs opacity-75">${formatLastActivity(parent.lastUpdate)}</div>
+                        </div>
+                        <p class="text-sm italic text-gray-600 truncate">${parent.lastMessage || 'No messages yet...'}</p>
+                        ${hasEmergencyInfo ? '<div class="text-xs text-red-600 mt-1">🚨 Emergency info available</div>' : ''}
                     </div>
-                    <p class="text-sm italic text-gray-600 truncate">${parent.lastMessage || 'No messages yet...'}</p>
-                </div>
-            `).join('');
+                `;
+            }).join('');
 
             document.querySelectorAll('.chat-item').forEach(item => {
-                item.addEventListener('click', () => {
+                item.addEventListener('click', (e) => {
+                    // Don't trigger if clicking on the parent name (emergency info)
+                    if (e.target.closest('[onclick*="showEmergencyInfoForParent"]')) {
+                        return;
+                    }
                     selectParent(item.dataset.parentId);
                 });
             });
@@ -416,6 +472,46 @@
 
             messagesContainer.prepend(box);
         }
+
+        // Function to show emergency info when clicking on parent name
+        window.showEmergencyInfoForParent = function(parentId) {
+            const emergencyInfo = emergencyInfoCache.get(parentId);
+            
+            if (!emergencyInfo) {
+                alert(`No emergency information available for ${parentId}`);
+                return;
+            }
+
+            // Create a modal to display emergency info
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-red-600">🚨 Emergency Information</h3>
+                        <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">×</button>
+                    </div>
+                    <div class="space-y-3">
+                        <div><strong>Parent:</strong> ${parentId}</div>
+                        <div><strong>Doctor:</strong> ${emergencyInfo.doctorName || '—'}</div>
+                        <div><strong>Hospital:</strong> ${emergencyInfo.hospital || '—'}</div>
+                        <div><strong>Phone:</strong> ${emergencyInfo.parentPhone || '—'}</div>
+                    </div>
+                    <div class="mt-4 text-xs text-gray-500">
+                        Received via WebSocket from parent
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Auto-close after 30 seconds
+            setTimeout(() => {
+                if (modal.parentElement) {
+                    modal.remove();
+                }
+            }, 30000);
+        };
 
         // Disable login button initially and try to authenticate
         loginBtn.disabled = true;

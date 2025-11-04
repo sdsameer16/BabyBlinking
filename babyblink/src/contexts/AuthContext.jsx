@@ -3,11 +3,15 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  // Prefer Vite env var, allow optional window override for dynamic configs, fallback to localhost:5000
-  const backendUrl =
-    (typeof window !== 'undefined' && window.__API_BASE__) ||
-    (import.meta && import.meta.env && import.meta.env.VITE_API_URL) ||
-    `http://localhost:${(import.meta && import.meta.env && import.meta.env.VITE_API_PORT) || 5000}/api`;
+  // Determine backend base URL.
+  // - If a window override is provided (window.__API_BASE__), use it.
+  // - In development (Vite dev server) prefer a relative `/api` so the Vite proxy can forward requests to the deployed backend and avoid CORS.
+  // - Otherwise use VITE_API_URL or the deployed backend URL.
+  const backendUrl = (typeof window !== 'undefined' && window.__API_BASE__) || (
+    (import.meta && import.meta.env && import.meta.env.DEV)
+      ? '/api'
+      : (import.meta && import.meta.env && import.meta.env.VITE_API_URL) || `https://babyblinking.onrender.com/api`
+  );
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -77,7 +81,13 @@ export const AuthProvider = ({ children }) => {
         console.log("📄 Response data:", data);
       } catch (jsonError) {
         console.error("❌ Failed to parse JSON response:", jsonError);
-        data = { error: "Invalid response from server" };
+          try {
+            const text = await response.text();
+            console.log('📄 Raw response text:', text);
+          } catch (tErr) {
+            console.error('❌ Failed to read raw response text:', tErr);
+          }
+          data = { error: "Invalid response from server" };
       }
 
       // 🚫 AUTO-LOGOUT BLOCKED USERS
@@ -102,7 +112,14 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (!response.ok) {
-        console.error(`❌ API Error ${response.status}:`, data);
+          console.error(`❌ API Error ${response.status}:`, data);
+          // Also show raw response body for debugging
+          try {
+            const raw = await response.clone().text();
+            console.warn('❗ Raw response body:', raw);
+          } catch (e) {
+            // ignore
+          }
       }
 
       return { 

@@ -3,16 +3,29 @@ import { io } from "socket.io-client";
 import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { useAuth } from "../contexts/AuthContext";
 
 const socket = io("https://livechatapp-1-7362.onrender.com");
 
 const ParentChat = () => {
+  const { user } = useAuth();
   const [parentName, setParentName] = useState("");
   const [isRegistered, setIsRegistered] = useState(false);
   const [message, setMessage] = useState("");
   const [chat, setChat] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
+  const notificationRef = useRef(null);
+
+  // Auto-populate baby name from user data and auto-register
+  useEffect(() => {
+    if (user && user.babyName) {
+      setParentName(user.babyName);
+      console.log('👶 Auto-populated baby name:', user.babyName);
+      // Auto-register with the baby name
+      setIsRegistered(true);
+    }
+  }, [user]);
 
   const handleRegister = () => {
     if (!parentName.trim()) {
@@ -22,7 +35,7 @@ const ParentChat = () => {
     setIsRegistered(true);
   };
 
-  useEffect(() => {
+    useEffect(() => {
     if (isRegistered && parentName) {
       // Register with the backend
       socket.emit("register", { role: "parent", parentId: parentName });
@@ -55,8 +68,30 @@ const ParentChat = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat]);
 
+  // Preload notification audio once and reuse it to avoid creating many Audio objects
+  useEffect(() => {
+    try {
+      const audio = new Audio("/notification.mp3");
+      audio.preload = 'auto';
+      notificationRef.current = audio;
+    } catch (e) {
+      console.warn('Could not initialize notification audio:', e);
+      notificationRef.current = null;
+    }
+    // no cleanup needed for Audio object
+  }, []);
+
   const playNotification = () => {
-    new Audio("/notification.mp3").play();
+    const audio = notificationRef.current;
+    if (!audio) return;
+    // Play returns a promise; handle potential user gesture / autoplay blocks
+    const playPromise = audio.play();
+    if (playPromise && typeof playPromise.then === 'function') {
+      playPromise.catch((err) => {
+        // Ignore NotAllowedError (autoplay blocked) but log for debugging
+        console.debug('Notification play error:', err?.name || err?.message || err);
+      });
+    }
   };
 
   const handleTyping = () => {
@@ -72,51 +107,23 @@ const ParentChat = () => {
     setMessage("");
   };
 
+
   // Show registration form if not registered
   if (!isRegistered) {
     return (
       <div style={{ width: 400, margin: "auto", padding: 20, fontFamily: "Poppins", textAlign: "center" }}>
-        <h3>👩‍👦 Parent Registration</h3>
-        <p>Please enter your name to start chatting with the caretaker</p>
-
-        <input
-          type="text"
-          value={parentName}
-          onChange={(e) => setParentName(e.target.value)}
-          placeholder="Enter your name (e.g., John Smith)"
-          style={{
-            width: "80%",
-            padding: 10,
-            borderRadius: 20,
-            border: "2px solid #ddd",
-            marginBottom: 20,
-            fontSize: 16
-          }}
-        />
-
-        <br />
-
-        <button
-          onClick={handleRegister}
-          style={{
-            padding: "10px 30px",
-            backgroundColor: "#4CAF50",
-            color: "white",
-            border: "none",
-            borderRadius: 20,
-            cursor: "pointer",
-            fontSize: 16
-          }}
-        >
-          Start Chatting
-        </button>
-
+        <h3>👩‍👦 Parent Chat</h3>
+        <p>Connecting with your baby's name...</p>
+        <div style={{ marginTop: 20 }}>
+          <div className="animate-spin text-2xl mb-2 text-center">🔄</div>
+          <p>Loading chat interface...</p>
+        </div>
         <ToastContainer position="bottom-right" />
       </div>
     );
   }
 
-  return (
+    return (
     <div style={{ width: 500, margin: "auto", padding: 20, fontFamily: "Poppins" }}>
       <h3>👩‍👦 Parent Chat</h3>
 
@@ -156,15 +163,15 @@ const ParentChat = () => {
             </div>
             <div style={{ fontSize: "10px", color: "black" }}>
               {new Date(msg.timestamp).toLocaleTimeString()}
+                        </div>
+                    </div>
+                ))}
+                <div ref={messagesEndRef} />
             </div>
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
 
       {isTyping && <div style={{ color: "black" }}>Caretaker is typing...</div>}
 
-      <input
+                    <input
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         onKeyPress={handleTyping}
@@ -173,8 +180,8 @@ const ParentChat = () => {
       />
       <button onClick={sendMessage}>Send</button>
       <ToastContainer position="bottom-right" />
-    </div>
-  );
+        </div>
+    );
 };
 
 export default ParentChat;

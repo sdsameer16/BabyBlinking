@@ -41,7 +41,7 @@ export default function ForgotPasswordPage() {
     console.log("Sending forgot password request to:", "/api/auth/forgot-password");
     console.log("Request body:", JSON.stringify({ email: form.email }));
     
-    const response = await fetch("http://localhost:5001/api/auth/forgot-password", {
+  const response = await fetch("/api/auth/forgot-password", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -111,7 +111,7 @@ export default function ForgotPasswordPage() {
 
   try {
     console.log("Sending reset password request...");
-    const response = await fetch("http://localhost:5001/api/auth/reset-password", {
+  const response = await fetch("/api/auth/reset-password", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
