@@ -111,7 +111,11 @@ export default function LoginPage() {
   return (
     <div className="login-container">
       <Link to="/" className="home-link">← Back to Home</Link>
-      
+      <div className="login-info">
+    <p>Use this demo account:</p>
+    <p>Email: gowharjaha786@gmail.com</p>
+    <p>Password: 123456</p>
+  </div>
       <div className="login-form-container">
         <form className="login-form" onSubmit={handleLogin}>
           <h2>Welcome Back!</h2>
