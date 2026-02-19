@@ -6,6 +6,11 @@
 KinderKares Baby Blink is a comprehensive web application that enables parents to remotely monitor their babies through live video streaming and real-time communication with caretakers. The platform provides secure authentication, emergency information management, and WebRTC-based video streaming.
 
 ---
+## 🔗 Related Interfaces
+
+- 🛠 Admin Panel: https://github.com/sdsameer16/BabyBlinksAdmin
+- 👩‍🏫 Caretaker Panel: https://github.com/sdsameer16/BabyBlinks_Caretakers
+- 🌐 Live Parent Panel: https://bblik.netlify.app/
 
 ## 🌟 Features
 
